@@ -1,35 +1,61 @@
 # Reconciliation LLM Layer
 
-An LLM explanation layer for the reconciliation engine. Takes a reconciliation summary as JSON, produces a plain-English narration, constrained to only the facts the input proves.
+> **Thesis:** In a regulated industry, an LLM should never own a number. This layer reads structured output from the reconciliation engine and produces plain-English narration — constrained to the facts the input proves.
+
+A traceability-constrained LLM layer that sits on top of the reconciliation engine. The engine computes. The LLM narrates. Every claim in the output maps back to a field in the input JSON.
+
+## Status
+
+**Working locally.** Core pipeline runs end-to-end. FastAPI wrapper included. Not yet deployed.
+
+## What works today
+
+- `build_context()` — transforms a `ReconciliationSummary` into a labeled text block
+- `build_user_prompt()` — constructs the user prompt from the context
+- `explain_summary()` — calls Gemini with a system prompt that forbids inventing facts
+- `POST /explain` — FastAPI endpoint accepting a summary, returning narration
+- `GET /health` — liveness check
 
 ## Design Principle
 
-Traceability before intelligence.
+**Traceability before intelligence.**
 
-Every number in the LLM output traces to a field in the input JSON. The LLM is not allowed to invent numbers, statuses, or categories.
+Every number in the LLM output traces to a field in the input JSON. The LLM is not allowed to invent numbers, statuses, or categories. If the input doesn't say it, the narration doesn't say it.
 
-## How It Works
+## Architecture
 
-1. A reconciliation summary arrives as JSON.
-2. context.py builds a text block from the JSON.
-3. prompt.py constrains the LLM to narrate only what the block proves.
-4. client.py calls Google Gemini and returns the explanation.
+- `llm/schemas.py` — Pydantic models matching reconciliation engine output
+- `llm/context.py` — transforms summary into a labeled text block
+- `llm/prompt.py` — system and user prompt templates
+- `llm/client.py` — Gemini API call, reads `GEMINI_API_KEY` from environment
+- `main.py` — FastAPI wrapper exposing `/explain` and `/health`
+
+The LLM never sees individual transactions. Only aggregate summaries.
 
 ## Stack
 
 - Python 3.10+
-- Google Gemini (gemini-3.8-flash)
+- Google Gemini (gemini-3.0-flash)
 - Pydantic v2
-- google-generativeai
+- FastAPI, Uvicorn
 
-## Author
+## What this demonstrates
 
-Anuoluwapo Daniel Ojo
-Software Engineer | Fintech and Payments
+- **Traceability as architecture** — the LLM cannot narrate what the input doesn't contain
+- **Separation of concerns** — context, prompt, and API call are independently testable
+- **Regulated-domain awareness** — aggregate-only inputs, no per-customer data in prompts
+- **Structured I/O** — Pydantic-validated schemas on both sides
 
-- GitHub: github.com/Daniel38215571
-- LinkedIn: linkedin.com/in/daniel-ojo-879273197
-- Email: ojodaniel38@gmail.com
-- Location: Lagos, Nigeria (Remote-ready)
+## What this is not
 
-Data x AI x Software. Building systems that prove themselves.
+- Not a replacement for the reconciliation engine. It reads its output.
+- Not a general-purpose LLM. Prompt and schema are specific to reconciliation.
+- Not deployed yet. Render deployment is next.
+- Not tested with a judged test set. That's the next milestone.
+
+## Setup
+
+```bash
+pip install -r requirements.txt
+cp .env.example .env
+# edit .env, set GEMINI_API_KEY
